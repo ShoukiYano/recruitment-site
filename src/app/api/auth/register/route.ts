@@ -6,7 +6,11 @@ import { z } from "zod"
 const registerSchema = z.object({
   name: z.string().min(1, "名前は必須です"),
   email: z.string().email("有効なメールアドレスを入力してください"),
-  password: z.string().min(8, "パスワードは8文字以上で入力してください"),
+  password: z.string()
+    .min(8, "パスワードは8文字以上で入力してください")
+    .regex(/[A-Z]/, "大文字を1文字以上含めてください")
+    .regex(/[a-z]/, "小文字を1文字以上含めてください")
+    .regex(/[0-9]/, "数字を1文字以上含めてください"),
   phone: z.string().optional(),
 })
 

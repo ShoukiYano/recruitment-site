@@ -34,6 +34,9 @@ const applicationSchema = z.object({
   // Step 3: 自己PR
   selfPR: z.string().min(10, "自己PRを10文字以上入力してください"),
   motivation: z.string().min(10, "志望動機を10文字以上入力してください"),
+  consentGiven: z.boolean().refine(val => val === true, {
+    message: "個人情報の取り扱いに同意してください",
+  }),
 })
 
 type ApplicationFormData = z.infer<typeof applicationSchema>
@@ -73,7 +76,7 @@ export function ApplicationForm({
     const fields: Record<number, (keyof ApplicationFormData)[]> = {
       1: ["lastName", "firstName", "lastNameKana", "firstNameKana", "email", "phone", "birthDate"],
       2: ["education", "employmentStatus", "experienceYears", "jobCategory"],
-      3: ["selfPR", "motivation"],
+      3: ["selfPR", "motivation", "consentGiven"],
     }
     return trigger(fields[currentStep])
   }
@@ -301,6 +304,27 @@ export function ApplicationForm({
                   <dd>{formValues.jobCategory}</dd>
                 </div>
               </dl>
+            </div>
+
+            {/* 個人情報同意 */}
+            <div className="mt-4 p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  {...register("consentGiven")}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#0D9488] focus:ring-[#0D9488]"
+                />
+                <span className="text-sm text-gray-700">
+                  <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#0D9488] underline">
+                    個人情報の取り扱い
+                  </a>
+                  について同意します。入力した情報は応募先企業に提供されます。{" "}
+                  <span className="text-red-500">*</span>
+                </span>
+              </label>
+              {errors.consentGiven && (
+                <p className="text-sm text-red-500 mt-2 ml-7">{errors.consentGiven.message}</p>
+              )}
             </div>
           </div>
         )}

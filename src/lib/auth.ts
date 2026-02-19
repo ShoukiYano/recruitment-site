@@ -38,6 +38,11 @@ export const authOptions: NextAuthOptions = {
           })
           if (!user || !user.isActive) return null
 
+          // アカウントロックチェック
+          if (user.lockedUntil && user.lockedUntil > new Date()) {
+            return null
+          }
+
           const subdomain = credentials.subdomain ?? ""
 
           if (subdomain === "system" || subdomain === "") {
@@ -57,7 +62,25 @@ export const authOptions: NextAuthOptions = {
           }
 
           const isValid = await bcrypt.compare(credentials.password, user.passwordHash)
-          if (!isValid) return null
+
+          if (!isValid) {
+            // ログイン失敗カウントを増加（5回で30分ロック）
+            const newFailCount = (user.loginFailCount ?? 0) + 1
+            await prisma.user.update({
+              where: { id: user.id },
+              data: newFailCount >= 5
+                ? { loginFailCount: newFailCount, lockedUntil: new Date(Date.now() + 30 * 60 * 1000) }
+                : { loginFailCount: newFailCount },
+            })
+            return null
+          }
+
+          // ログイン成功 → 失敗カウントをリセット
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { loginFailCount: 0, lockedUntil: null },
+          })
+
           return {
             id: user.id,
             email: user.email,

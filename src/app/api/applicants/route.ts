@@ -19,11 +19,23 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get("page") ?? "1")
     const limit = parseInt(searchParams.get("limit") ?? "20")
 
-    // テナントIDはセッションから取得（SYSTEM_ADMINはクエリパラメータ指定も可）
-    const tenantId =
-      session.user.role === "SYSTEM_ADMIN"
-        ? (searchParams.get("tenantId") ?? session.user.tenantId)
-        : session.user.tenantId
+    const queryTenantId = searchParams.get("tenantId")
+    let tenantId: string | null
+
+    if (session.user.role === "SYSTEM_ADMIN") {
+      // SYSTEM_ADMIN は任意のテナントにアクセス可（クエリ優先、なければセッション）
+      tenantId = queryTenantId ?? session.user.tenantId
+    } else {
+      // TENANT_ADMIN / TENANT_USER は tenantId クエリ必須
+      if (!queryTenantId) {
+        return NextResponse.json({ error: "tenantId が必要です" }, { status: 400 })
+      }
+      // 自テナント以外へのアクセスは禁止
+      if (queryTenantId !== session.user.tenantId) {
+        return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 })
+      }
+      tenantId = queryTenantId
+    }
 
     if (!tenantId) {
       return NextResponse.json({ error: "テナント情報がありません" }, { status: 403 })

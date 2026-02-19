@@ -16,6 +16,7 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
+import { toast } from "sonner"
 
 // 雇用形態ラベル
 const employmentTypeLabels: Record<string, string> = {
@@ -66,6 +67,30 @@ export default function JobDetailPage({
   const [job, setJob] = useState<JobDetail | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showReport, setShowReport] = useState(false)
+  const [reportReason, setReportReason] = useState("")
+  const [reportDetail, setReportDetail] = useState("")
+  const [isReporting, setIsReporting] = useState(false)
+
+  const handleReport = async () => {
+    if (!reportReason) return
+    setIsReporting(true)
+    try {
+      await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ jobId: id, reason: reportReason, detail: reportDetail }),
+      })
+      setShowReport(false)
+      setReportReason("")
+      setReportDetail("")
+      toast.success("通報を受け付けました。ご協力ありがとうございます。")
+    } catch {
+      toast.error("送信に失敗しました")
+    } finally {
+      setIsReporting(false)
+    }
+  }
 
   useEffect(() => {
     const fetchJob = async () => {
@@ -321,6 +346,62 @@ export default function JobDetailPage({
             </div>
           </aside>
         </div>
+        {/* 通報 */}
+        <div className="mt-8 text-center">
+          <button
+            onClick={() => setShowReport(true)}
+            className="text-xs text-gray-400 hover:text-gray-600 underline"
+          >
+            この求人を通報する
+          </button>
+        </div>
+
+        {showReport && (
+          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl p-6 max-w-md w-full shadow-xl">
+              <h3 className="text-lg font-bold mb-4">求人を通報する</h3>
+              <div className="space-y-3">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">通報理由 *</label>
+                  <select
+                    value={reportReason}
+                    onChange={e => setReportReason(e.target.value)}
+                    className="mt-1 w-full border rounded-md px-3 py-2 text-sm"
+                  >
+                    <option value="">選択してください</option>
+                    <option value="FALSE_INFO">虚偽情報</option>
+                    <option value="DISCRIMINATORY">差別的表現</option>
+                    <option value="FRAUD">詐欺・闇バイト</option>
+                    <option value="LABOR_VIOLATION">労働条件違反</option>
+                    <option value="OTHER">その他</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-gray-700">詳細（任意）</label>
+                  <textarea
+                    value={reportDetail}
+                    onChange={e => setReportDetail(e.target.value)}
+                    rows={3}
+                    placeholder="具体的な問題点をご記入ください"
+                    className="mt-1 w-full border rounded-md px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="flex gap-3 justify-end mt-4">
+                  <button onClick={() => setShowReport(false)} className="px-4 py-2 text-sm border rounded-md">
+                    キャンセル
+                  </button>
+                  <button
+                    onClick={handleReport}
+                    disabled={!reportReason || isReporting}
+                    className="px-4 py-2 text-sm bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isReporting ? "送信中..." : "通報する"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       {/* フッター */}

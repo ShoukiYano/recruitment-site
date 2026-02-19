@@ -14,8 +14,12 @@ import { toast } from "sonner"
 const registerSchema = z.object({
   name: z.string().min(1, "名前を入力してください"),
   email: z.string().email("有効なメールアドレスを入力してください"),
-  password: z.string().min(8, "パスワードは8文字以上で入力してください"),
-  confirmPassword: z.string().min(8, "確認パスワードを入力してください"),
+  password: z.string()
+    .min(8, "パスワードは8文字以上で入力してください")
+    .regex(/[A-Z]/, "大文字を1文字以上含めてください")
+    .regex(/[a-z]/, "小文字を1文字以上含めてください")
+    .regex(/[0-9]/, "数字を1文字以上含めてください"),
+  confirmPassword: z.string().min(1, "確認パスワードを入力してください"),
   phone: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "パスワードが一致しません",
