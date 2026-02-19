@@ -39,3 +39,39 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# 内部ドキュメント（機密情報を含むため非公開）
+ADMIN_ACCESS.md
+SUPABASE_SETUP.md
+VERCEL_DEPLOY.md
+
+# IDE・エディタ設定
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Claude Code ローカル設定
+.claude/
+
+# Windows 固有ファイル
+Thumbs.db
+ehthumbs.db
+desktop.ini
+$RECYCLE.BIN/
+
+# macOS 固有ファイル（共同作業者がMacの場合に備えて）
+.AppleDouble
+.LSOverride
+
+# E2Eテスト成果物（実行結果・レポート）
+playwright-report/
+test-results/
+/e2e-results/
+
+# その他キャッシュ・一時ファイル
+.turbo/
+*.log
+*.tmp

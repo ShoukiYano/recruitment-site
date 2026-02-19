@@ -1,0 +1,375 @@
+// AI採用自動化プラットフォーム - Prismaスキーマ
+// Prisma v7 形式
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// Enum定義
+// ============================================================
+
+/// ユーザーロール
+enum UserRole {
+  SYSTEM_ADMIN  // 運営会社スタッフ（全テナントアクセス可）
+  TENANT_ADMIN  // テナント管理者
+  TENANT_USER   // テナント一般ユーザー
+}
+
+/// 求人ステータス
+enum JobStatus {
+  DRAFT      // 下書き
+  PUBLISHED  // 公開中
+  CLOSED     // 募集終了
+}
+
+/// 雇用形態
+enum EmploymentType {
+  FULL_TIME   // 正社員
+  PART_TIME   // パートタイム
+  CONTRACT    // 契約社員
+  FREELANCE   // フリーランス
+  INTERNSHIP  // インターン
+}
+
+/// 応募ステータス
+enum ApplicationStatus {
+  NEW                  // 新規応募
+  SCREENING            // 書類選考中
+  INTERVIEW_SCHEDULED  // 面接予定
+  INTERVIEWED          // 面接済み
+  OFFERED              // 内定
+  REJECTED             // 不採用
+}
+
+/// AIランク
+enum AIRank {
+  S  // 85点以上
+  A  // 70-84点
+  B  // 50-69点
+  C  // 49点以下
+}
+
+/// メッセージ送信者タイプ
+enum MessageSenderType {
+  COMPANY     // 企業（テナント）
+  JOB_SEEKER  // 求職者
+  SYSTEM      // システム（自動返信）
+}
+
+/// 請求書ステータス
+enum InvoiceStatus {
+  DRAFT    // 下書き
+  SENT     // 送付済み
+  PAID     // 入金済み
+  OVERDUE  // 延滞
+}
+
+/// 料金プランタイプ
+enum BillingPlanType {
+  STARTER      // スターター（¥30,000/月）
+  BUSINESS     // ビジネス（¥100,000/月）
+  ENTERPRISE   // エンタープライズ（要相談）
+}
+
+// ============================================================
+// テナント関連
+// ============================================================
+
+/// テナント（顧客企業）
+model Tenant {
+  id            String   @id @default(cuid())
+  name          String                         // 企業名
+  subdomain     String   @unique               // サブドメイン（例: company-a）
+  customDomain  String?  @unique @map("custom_domain") // カスタムドメイン
+  plan          BillingPlanType @default(STARTER)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // リレーション
+  settings      TenantSetting?
+  users         User[]
+  jobs          Job[]
+  applications  Application[]
+  messages      Message[]
+  templates     MessageTemplate[]
+  aiSettings    AISetting[]
+  billing       TenantBilling?
+  invoices      Invoice[]
+
+  @@map("tenants")
+}
+
+/// テナント別設定（ブランディング等）
+model TenantSetting {
+  id             String  @id @default(cuid())
+  tenantId       String  @unique @map("tenant_id")
+  logoUrl        String? @map("logo_url")
+  primaryColor   String? @map("primary_color")
+  secondaryColor String? @map("secondary_color")
+  branding       Json?                          // その他ブランディング設定
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+// ============================================================
+// ユーザー関連
+// ============================================================
+
+/// 管理者ユーザー（運営スタッフ & テナント管理者）
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String?  @map("tenant_id")     // nullの場合はSYSTEM_ADMIN
+  email        String   @unique
+  name         String
+  passwordHash String   @map("password_hash")
+  role         UserRole @default(TENANT_USER)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  tenant   Tenant?   @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@index([email])
+  @@map("users")
+}
+
+/// 求職者
+model JobSeeker {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  phone        String?
+  passwordHash String   @map("password_hash")
+  profile      Json?                          // プロフィール情報（スキル、経歴等）
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  applications Application[]
+
+  @@index([email])
+  @@map("job_seekers")
+}
+
+// ============================================================
+// 求人・応募関連
+// ============================================================
+
+/// 求人情報
+model Job {
+  id             String         @id @default(cuid())
+  tenantId       String         @map("tenant_id")
+  title          String                            // 求人タイトル
+  description    String                            // 仕事内容
+  requirements   Json?                             // 応募資格（必須/歓迎）
+  benefits       Json?                             // 待遇・福利厚生
+  employmentType EmploymentType @map("employment_type")
+  location       String?                           // 勤務地
+  salaryMin      Int?           @map("salary_min") // 年収下限（万円）
+  salaryMax      Int?           @map("salary_max") // 年収上限（万円）
+  isRemote       Boolean        @default(false) @map("is_remote")
+  status         JobStatus      @default(DRAFT)
+  publishedAt    DateTime?      @map("published_at")
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  applications Application[]
+  aiSettings   AISetting[]
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("jobs")
+}
+
+/// 応募
+model Application {
+  id          String            @id @default(cuid())
+  tenantId    String            @map("tenant_id")
+  jobId       String            @map("job_id")
+  jobSeekerId String            @map("job_seeker_id")
+  formData    Json                                   // 応募フォームデータ
+  status      ApplicationStatus @default(NEW)
+  appliedAt   DateTime          @default(now()) @map("applied_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job        Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  jobSeeker  JobSeeker      @relation(fields: [jobSeekerId], references: [id], onDelete: Cascade)
+  evaluation AiEvaluation?
+  messages   Message[]
+
+  @@index([tenantId])
+  @@index([jobId])
+  @@index([jobSeekerId])
+  @@index([status])
+  @@map("applications")
+}
+
+/// AI評価結果
+model AiEvaluation {
+  id            String   @id @default(cuid())
+  applicationId String   @unique @map("application_id")
+  rank          AIRank
+  score         Float                           // 総合スコア（0-100）
+  breakdown     Json                            // 評価内訳（スキル/経験/学歴/動機/文章）
+  aiComment     String   @map("ai_comment")    // AIによるコメント
+  evaluatedAt   DateTime @default(now()) @map("evaluated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@map("ai_evaluations")
+}
+
+// ============================================================
+// メッセージ関連
+// ============================================================
+
+/// サイト内メッセージ
+model Message {
+  id            String            @id @default(cuid())
+  tenantId      String            @map("tenant_id")
+  applicationId String            @map("application_id")
+  senderId      String            @map("sender_id")
+  senderType    MessageSenderType @map("sender_type")
+  content       String
+  isRead        Boolean           @default(false) @map("is_read")
+  isAutoReply   Boolean           @default(false) @map("is_auto_reply")
+  sentAt        DateTime          @default(now()) @map("sent_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  // senderId はポリモーフィック（senderType により User or JobSeeker を参照）
+  // Prisma の FK 制約は張らず、アプリ層で解決する
+
+  @@index([tenantId])
+  @@index([applicationId])
+  @@index([senderId])
+  @@map("messages")
+}
+
+/// 返信テンプレート
+model MessageTemplate {
+  id       String  @id @default(cuid())
+  tenantId String  @map("tenant_id")
+  name     String                     // テンプレート名
+  rank     AIRank?                    // 対象ランク（nullは全ランク共通）
+  subject  String?                    // 件名
+  body     String                     // 本文（変数: {{氏名}} {{求人名}} 等）
+  isActive Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("message_templates")
+}
+
+// ============================================================
+// AI設定関連
+// ============================================================
+
+/// AI評価基準設定
+model AISetting {
+  id          String  @id @default(cuid())
+  tenantId    String  @map("tenant_id")
+  jobId       String? @map("job_id")  // nullはテナントデフォルト設定
+  /// 評価重み（合計100%）
+  /// { skillMatch: 40, experience: 25, education: 15, motivation: 10, responseQuality: 10 }
+  weights     Json
+  /// ランク閾値 { s: 85, a: 70, b: 50 }
+  thresholds  Json
+  /// 必須スキル一覧
+  requiredSkills Json  @map("required_skills")
+  /// 自動アクション設定（ランク別）
+  autoActions Json    @map("auto_actions")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  job    Job?   @relation(fields: [jobId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId])
+  @@map("ai_settings")
+}
+
+// ============================================================
+// 課金関連
+// ============================================================
+
+/// 料金プラン
+model BillingPlan {
+  id               String          @id @default(cuid())
+  name             String                               // プラン名
+  type             BillingPlanType @unique
+  monthlyPrice     Int?            @map("monthly_price") // 月額（円）nullはエンタープライズ
+  applicationLimit Int?            @map("application_limit") // 月間応募数上限
+  jobLimit         Int?            @map("job_limit")     // 求人数上限
+  userLimit        Int?            @map("user_limit")    // ユーザー数上限
+  features         Json                                  // 機能一覧
+  isActive         Boolean         @default(true) @map("is_active")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  tenantBillings TenantBilling[]
+
+  @@map("billing_plans")
+}
+
+/// テナント課金情報
+model TenantBilling {
+  id                    String   @id @default(cuid())
+  tenantId              String   @unique @map("tenant_id")
+  planId                String   @map("plan_id")
+  billingCycleStart     DateTime @map("billing_cycle_start")
+  billingCycleEnd       DateTime @map("billing_cycle_end")
+  currentApplicationCount Int    @default(0) @map("current_application_count")
+  currentJobCount       Int      @default(0) @map("current_job_count")
+  currentUserCount      Int      @default(0) @map("current_user_count")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  tenant Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan   BillingPlan @relation(fields: [planId], references: [id])
+
+  @@map("tenant_billing")
+}
+
+/// 請求書
+model Invoice {
+  id                  String        @id @default(cuid())
+  tenantId            String        @map("tenant_id")
+  invoiceNumber       String        @unique @map("invoice_number") // YYYYMM-XXXX形式
+  billingPeriodStart  DateTime      @map("billing_period_start")
+  billingPeriodEnd    DateTime      @map("billing_period_end")
+  subtotal            Int                                          // 小計（円）
+  tax                 Int                                          // 消費税（円）
+  total               Int                                          // 合計（円）
+  status              InvoiceStatus @default(DRAFT)
+  issuedAt            DateTime?     @map("issued_at")
+  dueAt               DateTime?     @map("due_at")
+  paidAt              DateTime?     @map("paid_at")
+  notes               String?                                      // メモ
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([status])
+  @@map("invoices")
+}
