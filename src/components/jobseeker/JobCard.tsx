@@ -33,6 +33,8 @@ interface JobCardProps {
       } | null
     }
   }
+  /** リンク先URL（未指定時は /jobs/[id]）*/
+  detailHref?: string
 }
 
 // 年収表示のフォーマット
@@ -43,14 +45,14 @@ function formatSalary(min: number | null, max: number | null): string {
   return "応相談"
 }
 
-export function JobCard({ job }: JobCardProps) {
+export function JobCard({ job, detailHref }: JobCardProps) {
   // スキルタグの抽出（requirementsから）
   const skills: string[] = Array.isArray(job.requirements?.skills)
     ? job.requirements.skills.slice(0, 5)
     : []
 
   return (
-    <Link href={`/jobs/${job.id}`}>
+    <Link href={detailHref ?? `/jobs/${job.id}`}>
       <Card className="h-full gap-4 bg-white hover:shadow-md transition-shadow cursor-pointer border border-gray-200">
         <CardContent className="p-5">
           {/* 企業名 */}

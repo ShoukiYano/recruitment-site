@@ -70,6 +70,7 @@ export async function GET(request: NextRequest) {
     const keyword = searchParams.get("keyword") || ""
     const location = searchParams.get("location") || ""
     const employmentType = searchParams.get("employmentType") || ""
+    const subdomain = searchParams.get("subdomain") || ""
     const page = parseInt(searchParams.get("page") || "1")
     const limit = parseInt(searchParams.get("limit") || "20")
 
@@ -108,8 +109,22 @@ export async function GET(request: NextRequest) {
     }
 
     // 公開モード（求職者向け）
+    // subdomain 指定時はそのテナントの求人のみ返す
+    let tenantIdFilter: string | undefined
+    if (subdomain) {
+      const tenant = await prisma.tenant.findUnique({
+        where: { subdomain },
+        select: { id: true, isActive: true },
+      })
+      if (!tenant || !tenant.isActive) {
+        return NextResponse.json({ jobs: [], total: 0, page: 1, totalPages: 0 })
+      }
+      tenantIdFilter = tenant.id
+    }
+
     const where = {
       status: JobStatus.PUBLISHED,
+      ...(tenantIdFilter && { tenantId: tenantIdFilter }),
       ...(keyword && {
         OR: [
           { title: { contains: keyword } },

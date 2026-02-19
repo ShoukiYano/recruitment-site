@@ -16,6 +16,7 @@ import {
   ChevronDown,
   LogOut,
   User,
+  Globe,
 } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import {
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/admin/applicants", label: "応募者一覧", icon: Users },
   { href: "/admin/messages", label: "メッセージ", icon: MessageSquare },
   { href: "/admin/templates", label: "テンプレート", icon: FileText },
+  { href: "/admin/settings/site", label: "サイトURL", icon: Globe },
   { href: "/admin/settings/ai", label: "設定", icon: Settings },
 ]
 

@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Search } from "lucide-react"
+import { getTenantJobsUrl } from "@/lib/url"
 
 interface Tenant {
   id: string
@@ -78,7 +79,16 @@ export default function TenantsPage() {
               ) : filtered.map(tenant => (
                 <tr key={tenant.id} className="border-b hover:bg-gray-50">
                   <td className="py-3 px-4 font-medium">{tenant.name}</td>
-                  <td className="py-3 px-4 text-gray-500">{tenant.subdomain}.example.com</td>
+                  <td className="py-3 px-4 text-gray-500">
+                    <a
+                      href={getTenantJobsUrl(tenant.subdomain)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-[#1E3A5F] hover:underline font-mono text-xs"
+                    >
+                      /t/{tenant.subdomain}/jobs
+                    </a>
+                  </td>
                   <td className="py-3 px-4">{tenant.plan}</td>
                   <td className="py-3 px-4">
                     <Badge variant={tenant.isActive ? "default" : "secondary"}>

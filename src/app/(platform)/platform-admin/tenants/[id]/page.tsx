@@ -8,8 +8,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { toast } from "sonner"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Copy, Check, ExternalLink } from "lucide-react"
 import Link from "next/link"
+import { getTenantJobsUrl, getTenantLoginUrl } from "@/lib/url"
 
 interface TenantDetail {
   id: string
@@ -20,6 +21,26 @@ interface TenantDetail {
   createdAt: string
   settings?: { logoUrl?: string; primaryColor?: string }
   _count?: { applications: number; jobs: number }
+}
+
+function CopyButton({ url }: { url: string }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(url).catch(() => {})
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div className="flex gap-2 mt-1">
+      <Input value={url} readOnly className="font-mono text-xs bg-gray-50" />
+      <Button variant="outline" size="icon" onClick={handleCopy}>
+        {copied ? <Check className="h-4 w-4 text-green-600" /> : <Copy className="h-4 w-4" />}
+      </Button>
+      <Button variant="outline" size="icon" asChild>
+        <a href={url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+      </Button>
+    </div>
+  )
 }
 
 export default function TenantDetailPage() {
@@ -109,7 +130,7 @@ export default function TenantDetailPage() {
             </div>
             <div>
               <Label className="text-gray-500">サブドメイン</Label>
-              <p className="font-medium">{tenant.subdomain}.example.com</p>
+              <p className="font-mono font-medium">{tenant.subdomain}</p>
             </div>
             <div>
               <Label className="text-gray-500">登録日</Label>
@@ -119,6 +140,21 @@ export default function TenantDetailPage() {
               <Label className="text-gray-500">求人数 / 応募数</Label>
               <p className="font-medium">{tenant._count?.jobs ?? 0}件 / {tenant._count?.applications ?? 0}件</p>
             </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* URL情報 */}
+      <Card>
+        <CardHeader><CardTitle>テナントURL</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <Label className="text-gray-500">採用サイト（求職者向け）</Label>
+            <CopyButton url={getTenantJobsUrl(tenant.subdomain)} />
+          </div>
+          <div>
+            <Label className="text-gray-500">管理者ログインURL</Label>
+            <CopyButton url={getTenantLoginUrl(tenant.subdomain)} />
           </div>
         </CardContent>
       </Card>
