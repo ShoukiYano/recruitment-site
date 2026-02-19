@@ -3,15 +3,9 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 // ─── IPホワイトリスト ───────────────────────────────────────────
-// SYSTEM_ADMIN_IP_WHITELIST : /admin-login, /platform-admin/* に適用
-// TENANT_IP_WHITELIST       : /t/*/login, /admin/* に適用
-// 未設定（空）の場合は制限なし
+// SYSTEM_ADMIN_IP_WHITELIST : /admin-login, /platform-admin/* に適用（Tailscale IP）
+// テナント管理エリアはIP制限なし
 const SYSTEM_ADMIN_IP_WHITELIST = (process.env.SYSTEM_ADMIN_IP_WHITELIST ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean)
-
-const TENANT_IP_WHITELIST = (process.env.TENANT_IP_WHITELIST ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean)
@@ -31,32 +25,15 @@ function isSystemAdminArea(pathname: string): boolean {
   return pathname.startsWith("/platform-admin") || pathname === "/admin-login"
 }
 
-/** テナント管理エリアか判定（お客様企業向け） */
-function isTenantAdminArea(pathname: string): boolean {
-  return (
-    (pathname.startsWith("/admin") && pathname !== "/admin-login") ||
-    pathname.startsWith("/t/")
-  )
-}
-
 export default withAuth(
   function middleware(req) {
     const token = req.nextauth.token
     const pathname = req.nextUrl.pathname
 
-    // ─── ③ IPホワイトリストチェック ──────────────────────────────
-    const clientIp = getClientIp(req)
-
-    // システム管理エリア（運営者のみ・厳格制限）
+    // ─── IPホワイトリストチェック（システム管理エリアのみ） ──────
     if (SYSTEM_ADMIN_IP_WHITELIST.length > 0 && isSystemAdminArea(pathname)) {
+      const clientIp = getClientIp(req)
       if (!SYSTEM_ADMIN_IP_WHITELIST.includes(clientIp)) {
-        return NextResponse.redirect(new URL("/access-denied", req.url))
-      }
-    }
-
-    // テナント管理エリア（お客様企業・任意制限）
-    if (TENANT_IP_WHITELIST.length > 0 && isTenantAdminArea(pathname)) {
-      if (!TENANT_IP_WHITELIST.includes(clientIp)) {
         return NextResponse.redirect(new URL("/access-denied", req.url))
       }
     }
