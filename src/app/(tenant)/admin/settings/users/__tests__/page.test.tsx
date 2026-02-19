@@ -17,10 +17,11 @@ vi.stubGlobal("fetch", mockFetch)
 
 import { useSession } from "next-auth/react"
 import UsersSettingsPage from "../page"
+import type { AppRole } from "@/types/next-auth"
 
 const mockUseSession = vi.mocked(useSession)
 
-function makeSession(overrides: Partial<{ name: string; email: string; role: string }> = {}) {
+function makeSession(overrides: Partial<{ name: string; email: string; role: AppRole }> = {}) {
   return {
     data: {
       expires: "2099-01-01",
@@ -28,7 +29,7 @@ function makeSession(overrides: Partial<{ name: string; email: string; role: str
         id: "u1",
         name: "山田太郎",
         email: "yamada@example.com",
-        role: "TENANT_ADMIN",
+        role: "TENANT_ADMIN" as AppRole,
         tenantId: "tenant-1",
         ...overrides,
       },

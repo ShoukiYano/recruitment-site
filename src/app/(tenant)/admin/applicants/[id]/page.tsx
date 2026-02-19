@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useParams } from "next/navigation"
 import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 import { ArrowLeft, Send } from "lucide-react"
+import { toast } from "sonner"
 
 // ランク別バッジ色
 const rankColors: Record<string, string> = {
@@ -24,7 +25,6 @@ const rankColors: Record<string, string> = {
   C: "bg-[#E5E7EB] text-gray-700",
 }
 
-// ステータス表示設定
 const statusOptions = [
   { value: "NEW", label: "新規" },
   { value: "SCREENING", label: "選考中" },
@@ -34,88 +34,187 @@ const statusOptions = [
   { value: "REJECTED", label: "不採用" },
 ]
 
-// モック: 応募者詳細データ
-const mockApplicant = {
-  id: "1",
-  name: "田中 太郎",
-  email: "tanaka@example.com",
-  phone: "090-1234-5678",
-  jobTitle: "フロントエンドエンジニア",
-  status: "INTERVIEW_SCHEDULED",
-  appliedAt: "2026-02-18",
-  evaluation: {
-    rank: "S",
-    score: 92,
-    breakdown: {
-      skillMatch: 95,
-      experience: 90,
-      education: 85,
-      motivation: 92,
-      responseQuality: 98,
-    },
-    aiComment:
-      "非常に高いスキルマッチ率を示しています。React/Next.jsの実務経験が5年以上あり、TypeScriptの深い理解が見られます。チームリーダーの経験もあり、即戦力として活躍が期待できます。",
-  },
-  profile: {
-    skills: ["React", "Next.js", "TypeScript", "Node.js", "AWS"],
-    experience: "フロントエンド開発 5年、チームリーダー 2年",
-    education: "東京工業大学 情報工学科 卒業",
-    currentCompany: "株式会社テック",
-  },
+const breakdownLabels: Record<string, string> = {
+  skillMatch: "スキルマッチ",
+  experience: "経験",
+  education: "学歴",
+  motivation: "志望度",
+  responseQuality: "文章力",
 }
 
-// モック: メッセージスレッド
-const mockMessages = [
-  {
-    id: "m1",
-    senderType: "SYSTEM" as const,
-    content: "田中 太郎さんがフロントエンドエンジニアに応募しました。",
-    sentAt: "2026-02-18 10:00",
-  },
-  {
-    id: "m2",
-    senderType: "COMPANY" as const,
-    content:
-      "田中様、ご応募ありがとうございます。書類選考を通過されましたので、面接の日程を調整させてください。",
-    sentAt: "2026-02-18 14:30",
-  },
-  {
-    id: "m3",
-    senderType: "JOB_SEEKER" as const,
-    content:
-      "ご連絡ありがとうございます。来週の火曜日か水曜日の午後であれば対応可能です。",
-    sentAt: "2026-02-18 16:45",
-  },
-]
+// 応募フォームの選択肢ラベル
+const educationLabels: Record<string, string> = {
+  high_school: "高等学校卒業",
+  vocational: "専門学校卒業",
+  associate: "短期大学卒業",
+  bachelor: "大学卒業",
+  master: "大学院修了（修士）",
+  doctor: "大学院修了（博士）",
+}
+
+const employmentStatusLabels: Record<string, string> = {
+  employed: "在職中",
+  unemployed: "離職中",
+  freelance: "フリーランス",
+  student: "学生",
+}
+
+const experienceYearsLabels: Record<string, string> = {
+  "0": "未経験",
+  "1-2": "1〜2年",
+  "3-5": "3〜5年",
+  "6-9": "6〜9年",
+  "10+": "10年以上",
+}
+
+type FormData = {
+  lastName?: string
+  firstName?: string
+  lastNameKana?: string
+  firstNameKana?: string
+  email?: string
+  phone?: string
+  birthDate?: string
+  education?: string
+  employmentStatus?: string
+  experienceYears?: string
+  jobCategory?: string
+  selfPR?: string
+  motivation?: string
+}
+
+type ApplicationDetail = {
+  id: string
+  status: string
+  appliedAt: string
+  formData: FormData
+  job: { id: string; title: string }
+  jobSeeker: {
+    id: string
+    name: string
+    email: string
+  }
+  evaluation: {
+    rank: string
+    score: number
+    breakdown: Record<string, number>
+    aiComment: string
+  } | null
+}
+
+type Message = {
+  id: string
+  senderType: "COMPANY" | "JOB_SEEKER" | "SYSTEM"
+  content: string
+  sentAt: string
+  isAutoReply: boolean
+  senderName: string | null
+}
+
+function InfoRow({ label, value }: { label: string; value: string | undefined | null }) {
+  if (!value) return null
+  return (
+    <div>
+      <dt className="text-gray-500">{label}</dt>
+      <dd className="font-medium mt-1">{value}</dd>
+    </div>
+  )
+}
 
 export default function ApplicantDetailPage() {
   const params = useParams()
-  const [status, setStatus] = useState(mockApplicant.status)
+  const id = params.id as string
+
+  const [application, setApplication] = useState<ApplicationDetail | null>(null)
+  const [messages, setMessages] = useState<Message[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [status, setStatus] = useState("")
   const [newMessage, setNewMessage] = useState("")
-  const [messages, setMessages] = useState(mockMessages)
+  const [isSending, setIsSending] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // ステータス変更ハンドラ
-  const handleStatusChange = (newStatus: string) => {
+  const fetchData = useCallback(async () => {
+    try {
+      const [appRes, msgRes] = await Promise.all([
+        fetch(`/api/applicants/${id}`),
+        fetch(`/api/messages/${id}`),
+      ])
+      const appJson = await appRes.json()
+      const msgJson = await msgRes.json()
+
+      if (appRes.ok && appJson.data) {
+        setApplication(appJson.data)
+        setStatus(appJson.data.status)
+      }
+      if (msgRes.ok && Array.isArray(msgJson)) {
+        setMessages(msgJson)
+      }
+    } catch (error) {
+      console.error("データ取得エラー:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { fetchData() }, [fetchData])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+  }, [messages])
+
+  const handleStatusChange = async (newStatus: string) => {
     setStatus(newStatus)
-    // TODO: PUT /api/applicants/[id]/status
+    try {
+      const res = await fetch(`/api/applicants/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) {
+        toast.error("ステータスの更新に失敗しました")
+        setStatus(application?.status ?? newStatus)
+      }
+    } catch {
+      toast.error("エラーが発生しました")
+    }
   }
 
-  // メッセージ送信ハンドラ
-  const handleSendMessage = () => {
-    if (!newMessage.trim()) return
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: `m${prev.length + 1}`,
-        senderType: "COMPANY" as const,
-        content: newMessage,
-        sentAt: new Date().toLocaleString("ja-JP"),
-      },
-    ])
-    setNewMessage("")
+  const handleSendMessage = async () => {
+    if (!newMessage.trim() || isSending) return
+    setIsSending(true)
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ applicationId: id, content: newMessage }),
+      })
+      if (res.ok) {
+        setNewMessage("")
+        const msgRes = await fetch(`/api/messages/${id}`)
+        if (msgRes.ok) {
+          const msgJson = await msgRes.json()
+          if (Array.isArray(msgJson)) setMessages(msgJson)
+        }
+      } else {
+        toast.error("メッセージの送信に失敗しました")
+      }
+    } catch {
+      toast.error("エラーが発生しました")
+    } finally {
+      setIsSending(false)
+    }
   }
 
-  const { evaluation, profile } = mockApplicant
+  if (isLoading) return <div className="text-gray-500 p-6">読み込み中...</div>
+  if (!application) return <div className="text-red-500 p-6">応募データが見つかりません</div>
+
+  const { jobSeeker, job, evaluation, formData } = application
+  const fullName = formData.lastName && formData.firstName
+    ? `${formData.lastName} ${formData.firstName}`
+    : jobSeeker.name
+  const fullNameKana = formData.lastNameKana && formData.firstNameKana
+    ? `${formData.lastNameKana} ${formData.firstNameKana}`
+    : undefined
 
   return (
     <div className="space-y-6">
@@ -127,11 +226,8 @@ export default function ApplicantDetailPage() {
               戻る
             </Button>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">
-            {mockApplicant.name}
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">{fullName}</h1>
         </div>
-        {/* ステータス変更 */}
         <Select value={status} onValueChange={handleStatusChange}>
           <SelectTrigger className="w-44">
             <SelectValue />
@@ -148,107 +244,117 @@ export default function ApplicantDetailPage() {
 
       {/* 2カラムレイアウト */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* 左カラム: AI評価 + 応募者情報 */}
+        {/* 左カラム */}
         <div className="lg:col-span-2 space-y-6">
+
           {/* AI評価 */}
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">AI評価</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-center gap-4">
-                <Badge className={`${rankColors[evaluation.rank]} text-2xl px-4 py-2`}>
-                  {evaluation.rank}
-                </Badge>
-                <div>
-                  <p className="text-3xl font-bold">{evaluation.score}点</p>
-                  <p className="text-sm text-gray-500">総合スコア</p>
-                </div>
-              </div>
-
-              {/* 評価内訳バー */}
-              <div className="space-y-3">
-                {Object.entries(evaluation.breakdown).map(([key, value]) => {
-                  const labels: Record<string, string> = {
-                    skillMatch: "スキルマッチ",
-                    experience: "経験",
-                    education: "学歴",
-                    motivation: "志望度",
-                    responseQuality: "文章力",
-                  }
-                  return (
-                    <div key={key} className="space-y-1">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-gray-600">{labels[key]}</span>
-                        <span className="font-medium">{value}点</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-[#0D9488] h-2 rounded-full transition-all"
-                          style={{ width: `${value}%` }}
-                        />
-                      </div>
+              {evaluation ? (
+                <>
+                  <div className="flex items-center gap-4">
+                    <Badge className={`${rankColors[evaluation.rank] ?? ""} text-2xl px-4 py-2`}>
+                      {evaluation.rank}
+                    </Badge>
+                    <div>
+                      <p className="text-3xl font-bold">{Math.round(evaluation.score)}点</p>
+                      <p className="text-sm text-gray-500">総合スコア</p>
                     </div>
-                  )
-                })}
-              </div>
-
-              {/* AIコメント */}
-              <div className="bg-gray-50 rounded-lg p-4">
-                <p className="text-sm font-medium text-gray-700 mb-1">AIコメント</p>
-                <p className="text-sm text-gray-600">{evaluation.aiComment}</p>
-              </div>
+                  </div>
+                  <div className="space-y-3">
+                    {Object.entries(evaluation.breakdown).map(([key, value]) => (
+                      <div key={key} className="space-y-1">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-gray-600">{breakdownLabels[key] ?? key}</span>
+                          <span className="font-medium">{Math.round(value)}点</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-[#0D9488] h-2 rounded-full transition-all"
+                            style={{ width: `${Math.min(value, 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm font-medium text-gray-700 mb-1">AIコメント</p>
+                    <p className="text-sm text-gray-600">{evaluation.aiComment}</p>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-gray-400">まだAI評価が実行されていません</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* 応募者情報 */}
+          {/* 基本情報 */}
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">応募者情報</CardTitle>
+              <CardTitle className="text-lg">基本情報</CardTitle>
             </CardHeader>
             <CardContent>
               <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <dt className="text-gray-500">氏名</dt>
-                  <dd className="font-medium mt-1">{mockApplicant.name}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">メール</dt>
-                  <dd className="font-medium mt-1">{mockApplicant.email}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">電話番号</dt>
-                  <dd className="font-medium mt-1">{mockApplicant.phone}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">応募求人</dt>
-                  <dd className="font-medium mt-1">{mockApplicant.jobTitle}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">現在の勤務先</dt>
-                  <dd className="font-medium mt-1">{profile.currentCompany}</dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">学歴</dt>
-                  <dd className="font-medium mt-1">{profile.education}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-gray-500">経歴</dt>
-                  <dd className="font-medium mt-1">{profile.experience}</dd>
-                </div>
-                <div className="sm:col-span-2">
-                  <dt className="text-gray-500">スキル</dt>
-                  <dd className="mt-1 flex flex-wrap gap-2">
-                    {profile.skills.map((skill) => (
-                      <Badge key={skill} variant="secondary">
-                        {skill}
-                      </Badge>
-                    ))}
-                  </dd>
-                </div>
+                <InfoRow label="氏名" value={fullName} />
+                <InfoRow label="フリガナ" value={fullNameKana} />
+                <InfoRow label="メールアドレス" value={formData.email ?? jobSeeker.email} />
+                <InfoRow label="電話番号" value={formData.phone} />
+                <InfoRow label="生年月日" value={formData.birthDate} />
+                <InfoRow label="応募求人" value={job.title} />
+                <InfoRow label="応募日" value={application.appliedAt.split("T")[0]} />
               </dl>
             </CardContent>
           </Card>
+
+          {/* 職務経歴 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">職務経歴</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+                <InfoRow
+                  label="最終学歴"
+                  value={formData.education ? educationLabels[formData.education] ?? formData.education : undefined}
+                />
+                <InfoRow
+                  label="就業状況"
+                  value={formData.employmentStatus ? employmentStatusLabels[formData.employmentStatus] ?? formData.employmentStatus : undefined}
+                />
+                <InfoRow
+                  label="経験年数"
+                  value={formData.experienceYears ? experienceYearsLabels[formData.experienceYears] ?? formData.experienceYears : undefined}
+                />
+                <InfoRow label="職種" value={formData.jobCategory} />
+              </dl>
+            </CardContent>
+          </Card>
+
+          {/* 自己PR・志望動機 */}
+          {(formData.selfPR || formData.motivation) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">自己PR・志望動機</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                {formData.selfPR && (
+                  <div>
+                    <p className="font-medium text-gray-700 mb-1">自己PR</p>
+                    <p className="text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{formData.selfPR}</p>
+                  </div>
+                )}
+                {formData.motivation && (
+                  <div>
+                    <p className="font-medium text-gray-700 mb-1">志望動機</p>
+                    <p className="text-gray-600 whitespace-pre-wrap bg-gray-50 rounded-lg p-3">{formData.motivation}</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* 右カラム: メッセージスレッド */}
@@ -258,46 +364,42 @@ export default function ApplicantDetailPage() {
               <CardTitle className="text-lg">メッセージ</CardTitle>
             </CardHeader>
             <CardContent className="flex-1 flex flex-col overflow-hidden p-0">
-              {/* メッセージ一覧 */}
-              <div className="flex-1 overflow-y-auto px-4 space-y-3">
-                {messages.map((msg) => {
-                  const isCompany = msg.senderType === "COMPANY"
-                  const isSystem = msg.senderType === "SYSTEM"
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`flex ${isCompany ? "justify-end" : "justify-start"}`}
-                    >
-                      {isSystem ? (
-                        <div className="w-full text-center">
-                          <p className="text-xs text-gray-400 bg-gray-50 inline-block px-3 py-1 rounded-full">
-                            {msg.content}
-                          </p>
-                        </div>
-                      ) : (
-                        <div
-                          className={`max-w-[85%] rounded-lg px-3 py-2 ${
-                            isCompany
-                              ? "bg-[#0D9488] text-white"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          <p className="text-sm">{msg.content}</p>
-                          <p
-                            className={`text-[10px] mt-1 ${
-                              isCompany ? "text-white/70" : "text-gray-400"
+              <div className="flex-1 overflow-y-auto px-4 space-y-3 py-3">
+                {messages.length === 0 ? (
+                  <p className="text-sm text-gray-400 text-center mt-8">まだメッセージはありません</p>
+                ) : (
+                  messages.map((msg) => {
+                    const isCompany = msg.senderType === "COMPANY"
+                    const isSystem = msg.senderType === "SYSTEM"
+                    return (
+                      <div
+                        key={msg.id}
+                        className={`flex ${isCompany ? "justify-end" : "justify-start"}`}
+                      >
+                        {isSystem ? (
+                          <div className="w-full text-center">
+                            <p className="text-xs text-gray-400 bg-gray-50 inline-block px-3 py-1 rounded-full">
+                              {msg.content}
+                            </p>
+                          </div>
+                        ) : (
+                          <div
+                            className={`max-w-[85%] rounded-lg px-3 py-2 ${
+                              isCompany ? "bg-[#0D9488] text-white" : "bg-gray-100 text-gray-800"
                             }`}
                           >
-                            {msg.sentAt}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                            <p className="text-sm">{msg.content}</p>
+                            <p className={`text-[10px] mt-1 ${isCompany ? "text-white/70" : "text-gray-400"}`}>
+                              {new Date(msg.sentAt).toLocaleString("ja-JP")}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })
+                )}
+                <div ref={messagesEndRef} />
               </div>
-
-              {/* メッセージ入力 */}
               <div className="shrink-0 border-t p-3 flex gap-2">
                 <Input
                   placeholder="メッセージを入力..."
@@ -314,6 +416,7 @@ export default function ApplicantDetailPage() {
                   size="sm"
                   className="bg-[#0D9488] hover:bg-[#0D9488]/90"
                   onClick={handleSendMessage}
+                  disabled={isSending}
                 >
                   <Send className="h-4 w-4" />
                 </Button>

@@ -7,32 +7,26 @@ import { prisma } from "@/lib/prisma"
 // GET: テナントIDでフィルタ、ステータス/ランクでフィルタ可能
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user) {
+  if (!session?.user || session.user.role === "JOB_SEEKER") {
     return NextResponse.json({ error: "認証が必要です" }, { status: 401 })
   }
 
   try {
     const { searchParams } = new URL(request.url)
-    const tenantId = searchParams.get("tenantId")
     const status = searchParams.get("status")
     const rank = searchParams.get("rank")
     const search = searchParams.get("search")
     const page = parseInt(searchParams.get("page") ?? "1")
     const limit = parseInt(searchParams.get("limit") ?? "20")
 
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenantIdは必須です" },
-        { status: 400 }
-      )
-    }
+    // テナントIDはセッションから取得（SYSTEM_ADMINはクエリパラメータ指定も可）
+    const tenantId =
+      session.user.role === "SYSTEM_ADMIN"
+        ? (searchParams.get("tenantId") ?? session.user.tenantId)
+        : session.user.tenantId
 
-    // 権限チェック: SYSTEM_ADMIN は全テナント可、それ以外は自テナントのみ
-    const role = session.user.role
-    if (role !== "SYSTEM_ADMIN") {
-      if (session.user.tenantId !== tenantId) {
-        return NextResponse.json({ error: "アクセス権限がありません" }, { status: 403 })
-      }
+    if (!tenantId) {
+      return NextResponse.json({ error: "テナント情報がありません" }, { status: 403 })
     }
 
     // フィルタ条件を構築

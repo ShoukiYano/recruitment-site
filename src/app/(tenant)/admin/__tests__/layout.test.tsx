@@ -21,6 +21,7 @@ vi.mock("next/navigation", () => ({
 
 import { useSession } from "next-auth/react"
 import TenantAdminLayout from "../layout"
+import type { AppRole } from "@/types/next-auth"
 
 const mockUseSession = vi.mocked(useSession)
 
@@ -32,7 +33,7 @@ function makeSession(name = "テスト管理者") {
         id: "u1",
         name,
         email: "admin@example.com",
-        role: "TENANT_ADMIN",
+        role: "TENANT_ADMIN" as AppRole,
         tenantId: "tenant-1",
       },
     },

@@ -1,5 +1,6 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { useSession, signOut } from "next-auth/react"
@@ -43,9 +44,19 @@ export default function TenantAdminLayout({
   const pathname = usePathname()
   const router = useRouter()
   const { data: session } = useSession()
+  const [tenantName, setTenantName] = useState<string>("")
 
   const userName = session?.user?.name ?? "管理者"
   const userInitial = userName.charAt(0)
+
+  useEffect(() => {
+    fetch("/api/tenant-settings")
+      .then((res) => res.json())
+      .then((json) => {
+        if (json.data?.tenantName) setTenantName(json.data.tenantName)
+      })
+      .catch(console.error)
+  }, [])
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -83,7 +94,7 @@ export default function TenantAdminLayout({
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* ヘッダー */}
         <header className="h-14 bg-[#1E3A5F] flex items-center justify-between px-6 shrink-0">
-          <h1 className="text-white font-semibold">株式会社サンプル</h1>
+          <h1 className="text-white font-semibold">{tenantName || "採用管理"}</h1>
           <div className="flex items-center gap-4">
             {/* 通知アイコン */}
             <button className="relative text-white/80 hover:text-white transition-colors">

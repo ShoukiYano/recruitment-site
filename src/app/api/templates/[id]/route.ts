@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { prisma } from "@/lib/prisma"
 import { updateTemplate, deleteTemplate } from "@/lib/services/template-service"
 import { z } from "zod"
 import { AIRank } from "@prisma/client"
@@ -28,15 +29,31 @@ export async function PUT(
 
   try {
     const { id } = await params
+
+    // テンプレートが自テナントのものかチェック
+    const template = await prisma.messageTemplate.findUnique({
+      where: { id },
+      select: { tenantId: true },
+    })
+    if (!template) {
+      return NextResponse.json({ error: "テンプレートが見つかりません" }, { status: 404 })
+    }
+    if (
+      session.user.role !== "SYSTEM_ADMIN" &&
+      template.tenantId !== session.user.tenantId
+    ) {
+      return NextResponse.json({ error: "権限がありません" }, { status: 403 })
+    }
+
     const body = await request.json()
     const data = updateSchema.parse(body)
 
-    const template = await updateTemplate(id, {
+    const updated = await updateTemplate(id, {
       ...data,
       rank: data.rank === undefined ? undefined : (data.rank as AIRank | null),
     })
 
-    return NextResponse.json(template)
+    return NextResponse.json(updated)
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: error.issues[0].message }, { status: 400 })
@@ -61,6 +78,22 @@ export async function DELETE(
 
   try {
     const { id } = await params
+
+    // テンプレートが自テナントのものかチェック
+    const template = await prisma.messageTemplate.findUnique({
+      where: { id },
+      select: { tenantId: true },
+    })
+    if (!template) {
+      return NextResponse.json({ error: "テンプレートが見つかりません" }, { status: 404 })
+    }
+    if (
+      session.user.role !== "SYSTEM_ADMIN" &&
+      template.tenantId !== session.user.tenantId
+    ) {
+      return NextResponse.json({ error: "権限がありません" }, { status: 403 })
+    }
+
     await deleteTemplate(id)
     return NextResponse.json({ success: true })
   } catch (error) {

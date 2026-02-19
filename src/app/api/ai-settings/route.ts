@@ -1,21 +1,29 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
 
 // AI設定取得
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user || session.user.role === "JOB_SEEKER") {
+    return NextResponse.json({ error: "認証が必要です" }, { status: 401 })
+  }
+
+  // テナントIDはセッションから取得（SYSTEM_ADMINのみクエリパラメータを許可）
+  const { searchParams } = new URL(request.url)
+  const tenantId =
+    session.user.role === "SYSTEM_ADMIN"
+      ? (searchParams.get("tenantId") ?? session.user.tenantId)
+      : session.user.tenantId
+
+  if (!tenantId) {
+    return NextResponse.json({ error: "tenantIdは必須です" }, { status: 400 })
+  }
+
   try {
-    const { searchParams } = new URL(request.url)
-    const tenantId = searchParams.get("tenantId")
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenantIdは必須です" },
-        { status: 400 }
-      )
-    }
-
     // テナントデフォルト設定（jobIdがnull）を取得
-    let settings = await prisma.aISetting.findFirst({
+    const settings = await prisma.aISetting.findFirst({
       where: { tenantId, jobId: null },
     })
 
@@ -50,16 +58,20 @@ export async function GET(request: NextRequest) {
 
 // AI設定更新
 export async function PUT(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user || session.user.role === "JOB_SEEKER") {
+    return NextResponse.json({ error: "認証が必要です" }, { status: 401 })
+  }
+
+  // テナントIDはセッションから取得
+  const tenantId = session.user.tenantId
+  if (!tenantId) {
+    return NextResponse.json({ error: "tenantIdは必須です" }, { status: 400 })
+  }
+
   try {
     const body = await request.json()
-    const { tenantId, weights, thresholds, requiredSkills, autoActions } = body
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenantIdは必須です" },
-        { status: 400 }
-      )
-    }
+    const { weights, thresholds, requiredSkills, autoActions } = body
 
     // 重みの合計が100かチェック
     const totalWeight = Object.values(weights as Record<string, number>).reduce(
@@ -74,14 +86,12 @@ export async function PUT(request: NextRequest) {
     }
 
     // upsert: 既存なら更新、なければ作成
+    const existing = await prisma.aISetting.findFirst({
+      where: { tenantId, jobId: null },
+    })
+
     const settings = await prisma.aISetting.upsert({
-      where: {
-        id: (
-          await prisma.aISetting.findFirst({
-            where: { tenantId, jobId: null },
-          })
-        )?.id ?? "",
-      },
+      where: { id: existing?.id ?? "" },
       create: {
         tenantId,
         weights,

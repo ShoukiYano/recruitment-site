@@ -8,10 +8,11 @@ vi.mock("next-auth/react", () => ({
 }))
 
 import { useSession } from "next-auth/react"
+import type { AppRole } from "@/types/next-auth"
 
 const mockUseSession = vi.mocked(useSession)
 
-function makeSession(role: string, tenantId: string | null = null) {
+function makeSession(role: AppRole, tenantId: string | null = null) {
   return {
     data: {
       expires: "2099-01-01",

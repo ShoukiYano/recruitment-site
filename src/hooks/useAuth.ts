@@ -1,7 +1,7 @@
 "use client"
 
 import { useSession } from "next-auth/react"
-import { UserRole } from "@prisma/client"
+import { AppRole } from "@/types/next-auth"
 
 export function useAuth() {
   const { data: session, status } = useSession()
@@ -16,7 +16,7 @@ export function useAuth() {
   const isJobSeeker = user?.role === "JOB_SEEKER"
   const isTenantMember = isTenantAdmin || isTenantUser
 
-  function hasRole(role: UserRole | "JOB_SEEKER"): boolean {
+  function hasRole(role: AppRole): boolean {
     return user?.role === role
   }
 

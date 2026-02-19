@@ -5,27 +5,23 @@ import { authOptions } from "@/lib/auth"
 
 // テンプレート一覧取得
 export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session?.user || session.user.role === "JOB_SEEKER") {
+    return NextResponse.json({ error: "認証が必要です" }, { status: 401 })
+  }
+
+  // テナントIDはセッションから取得（クエリパラメータは無視）
+  const tenantId = session.user.tenantId
+  if (!tenantId) {
+    return NextResponse.json({ error: "tenantIdは必須です" }, { status: 400 })
+  }
+
   try {
     const { searchParams } = new URL(request.url)
     const rank = searchParams.get("rank")
 
-    // クエリパラメータ or セッションからtenantIdを取得
-    let tenantId = searchParams.get("tenantId")
-    if (!tenantId) {
-      const session = await getServerSession(authOptions)
-      tenantId = session?.user?.tenantId ?? null
-    }
-
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: "tenantIdは必須です" },
-        { status: 400 }
-      )
-    }
-
     const where: Record<string, unknown> = { tenantId }
     if (rank) {
-      // "ALL"の場合はnull（共通テンプレート）を検索
       where.rank = rank === "ALL" ? null : rank
     }
 
@@ -46,13 +42,13 @@ export async function GET(request: NextRequest) {
 
 // テンプレート作成
 export async function POST(request: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions)
-    const tenantId = session?.user?.tenantId
-    if (!tenantId) {
-      return NextResponse.json({ error: "認証が必要です" }, { status: 401 })
-    }
+  const session = await getServerSession(authOptions)
+  const tenantId = session?.user?.tenantId
+  if (!tenantId || session?.user?.role === "JOB_SEEKER") {
+    return NextResponse.json({ error: "認証が必要です" }, { status: 401 })
+  }
 
+  try {
     const body = await request.json()
     const { name, rank, subject, body: templateBody } = body
 

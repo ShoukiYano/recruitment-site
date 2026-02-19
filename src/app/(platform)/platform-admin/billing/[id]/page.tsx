@@ -15,6 +15,8 @@ const statusLabels: Record<string, { label: string; variant: "default" | "second
   overdue: { label: "期限超過", variant: "destructive" },
 }
 
+type InvoiceStatus = "draft" | "sent" | "paid" | "overdue"
+
 // モックデータ
 const mockInvoice = {
   id: "inv-001",
@@ -23,7 +25,7 @@ const mockInvoice = {
   amount: 98000,
   tax: 9800,
   total: 107800,
-  status: "sent" as const,
+  status: "sent" as InvoiceStatus,
   dueDate: "2026-02-28",
   createdAt: "2026-02-01",
   items: [

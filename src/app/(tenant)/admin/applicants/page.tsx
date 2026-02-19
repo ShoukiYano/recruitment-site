@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect, useCallback } from "react"
 import Link from "next/link"
 import {
   useReactTable,
@@ -60,7 +60,6 @@ const statusConfig: Record<string, { label: string; className: string }> = {
   REJECTED: { label: "不採用", className: "bg-red-100 text-red-800" },
 }
 
-// モックデータ型
 type Applicant = {
   id: string
   name: string
@@ -72,36 +71,51 @@ type Applicant = {
   appliedAt: string
 }
 
-// モックデータ
-const mockApplicants: Applicant[] = [
-  { id: "1", name: "田中 太郎", email: "tanaka@example.com", jobTitle: "フロントエンドエンジニア", rank: "S", score: 92, status: "INTERVIEW_SCHEDULED", appliedAt: "2026-02-18" },
-  { id: "2", name: "佐藤 花子", email: "sato@example.com", jobTitle: "バックエンドエンジニア", rank: "A", score: 78, status: "SCREENING", appliedAt: "2026-02-17" },
-  { id: "3", name: "鈴木 一郎", email: "suzuki@example.com", jobTitle: "プロダクトマネージャー", rank: "A", score: 75, status: "NEW", appliedAt: "2026-02-17" },
-  { id: "4", name: "高橋 美咲", email: "takahashi@example.com", jobTitle: "デザイナー", rank: "B", score: 63, status: "SCREENING", appliedAt: "2026-02-16" },
-  { id: "5", name: "渡辺 健太", email: "watanabe@example.com", jobTitle: "フロントエンドエンジニア", rank: "C", score: 42, status: "REJECTED", appliedAt: "2026-02-16" },
-  { id: "6", name: "伊藤 真一", email: "ito@example.com", jobTitle: "インフラエンジニア", rank: "S", score: 88, status: "OFFERED", appliedAt: "2026-02-15" },
-  { id: "7", name: "山本 由美", email: "yamamoto@example.com", jobTitle: "バックエンドエンジニア", rank: "B", score: 55, status: "NEW", appliedAt: "2026-02-15" },
-  { id: "8", name: "中村 大輔", email: "nakamura@example.com", jobTitle: "フロントエンドエンジニア", rank: "A", score: 71, status: "INTERVIEW_SCHEDULED", appliedAt: "2026-02-14" },
-]
-
-// クイック統計
-const quickStats = [
-  { label: "新規", count: 2, icon: Users, color: "text-blue-600" },
-  { label: "選考中", count: 2, icon: Clock, color: "text-yellow-600" },
-  { label: "面接予定", count: 2, icon: CalendarCheck, color: "text-purple-600" },
-  { label: "内定", count: 1, icon: CheckCircle, color: "text-green-600" },
-]
-
 export default function ApplicantsPage() {
+  const [applicants, setApplicants] = useState<Applicant[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [sorting, setSorting] = useState<SortingState>([])
   const [globalFilter, setGlobalFilter] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [rankFilter, setRankFilter] = useState<string>("all")
   const [rowSelection, setRowSelection] = useState({})
 
-  // フィルタ済みデータ
+  const fetchApplicants = useCallback(async () => {
+    setIsLoading(true)
+    try {
+      const res = await fetch("/api/applicants?limit=100")
+      const json = await res.json()
+      const raw = json.data ?? []
+      const mapped: Applicant[] = raw.map((app: {
+        id: string
+        status: string
+        appliedAt: string
+        job: { title: string }
+        jobSeeker: { name: string; email: string }
+        evaluation?: { rank: string; score: number } | null
+      }) => ({
+        id: app.id,
+        name: app.jobSeeker.name,
+        email: app.jobSeeker.email,
+        jobTitle: app.job.title,
+        rank: app.evaluation?.rank ?? "-",
+        score: app.evaluation?.score ?? 0,
+        status: app.status,
+        appliedAt: app.appliedAt.split("T")[0],
+      }))
+      setApplicants(mapped)
+    } catch (error) {
+      console.error("応募者一覧取得エラー:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { fetchApplicants() }, [fetchApplicants])
+
+  // クライアントサイドフィルタ
   const filteredData = useMemo(() => {
-    let data = mockApplicants
+    let data = applicants
     if (statusFilter !== "all") {
       data = data.filter((a) => a.status === statusFilter)
     }
@@ -109,9 +123,16 @@ export default function ApplicantsPage() {
       data = data.filter((a) => a.rank === rankFilter)
     }
     return data
-  }, [statusFilter, rankFilter])
+  }, [applicants, statusFilter, rankFilter])
 
-  // TanStack Table カラム定義
+  // クイック統計（実データから計算）
+  const quickStats = useMemo(() => [
+    { label: "新規", count: applicants.filter((a) => a.status === "NEW").length, icon: Users, color: "text-blue-600" },
+    { label: "選考中", count: applicants.filter((a) => a.status === "SCREENING").length, icon: Clock, color: "text-yellow-600" },
+    { label: "面接予定", count: applicants.filter((a) => a.status === "INTERVIEW_SCHEDULED").length, icon: CalendarCheck, color: "text-purple-600" },
+    { label: "内定", count: applicants.filter((a) => a.status === "OFFERED").length, icon: CheckCircle, color: "text-green-600" },
+  ], [applicants])
+
   const columns: ColumnDef<Applicant>[] = useMemo(
     () => [
       {
@@ -147,22 +168,26 @@ export default function ApplicantsPage() {
       {
         accessorKey: "rank",
         header: "AIランク",
-        cell: ({ row }) => (
-          <Badge className={rankColors[row.original.rank]}>
-            {row.original.rank}
-          </Badge>
-        ),
+        cell: ({ row }) => {
+          const rank = row.original.rank
+          if (rank === "-") return <span className="text-gray-400 text-xs">未評価</span>
+          return <Badge className={rankColors[rank] ?? ""}>{rank}</Badge>
+        },
       },
       {
         accessorKey: "score",
         header: "AIスコア",
-        cell: ({ row }) => <span>{row.original.score}点</span>,
+        cell: ({ row }) => {
+          const score = row.original.score
+          return <span>{score > 0 ? `${score}点` : "-"}</span>
+        },
       },
       {
         accessorKey: "status",
         header: "ステータス",
         cell: ({ row }) => {
           const config = statusConfig[row.original.status]
+          if (!config) return <span className="text-gray-400">-</span>
           return <Badge className={config.className}>{config.label}</Badge>
         },
       },
@@ -200,6 +225,8 @@ export default function ApplicantsPage() {
   })
 
   const selectedCount = Object.keys(rowSelection).length
+
+  if (isLoading) return <div className="text-gray-500 p-6">読み込み中...</div>
 
   return (
     <div className="space-y-6">
@@ -290,42 +317,46 @@ export default function ApplicantsPage() {
       {/* データテーブル */}
       <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b border-gray-200 bg-gray-50">
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className="text-left py-3 px-4 font-medium text-gray-500 cursor-pointer select-none"
-                        onClick={header.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
-                      </th>
-                    ))}
-                  </tr>
-                ))}
-              </thead>
-              <tbody>
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="py-3 px-4">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {filteredData.length === 0 ? (
+            <p className="text-sm text-gray-400 py-8 text-center">応募者がいません</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <tr key={headerGroup.id} className="border-b border-gray-200 bg-gray-50">
+                      {headerGroup.headers.map((header) => (
+                        <th
+                          key={header.id}
+                          className="text-left py-3 px-4 font-medium text-gray-500 cursor-pointer select-none"
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </th>
+                      ))}
+                    </tr>
+                  ))}
+                </thead>
+                <tbody>
+                  {table.getRowModel().rows.map((row) => (
+                    <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                      {row.getVisibleCells().map((cell) => (
+                        <td key={cell.id} className="py-3 px-4">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
 
           {/* ページネーション */}
           <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200">
             <p className="text-sm text-gray-500">
               全 {filteredData.length} 件中{" "}
-              {table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1}-
+              {Math.min(table.getState().pagination.pageIndex * table.getState().pagination.pageSize + 1, filteredData.length)}-
               {Math.min(
                 (table.getState().pagination.pageIndex + 1) * table.getState().pagination.pageSize,
                 filteredData.length

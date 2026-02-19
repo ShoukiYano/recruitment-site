@@ -2,7 +2,6 @@ import { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { UserRole } from "@prisma/client"
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -29,7 +28,7 @@ export const authOptions: NextAuthOptions = {
             id: jobSeeker.id,
             email: jobSeeker.email,
             name: jobSeeker.name,
-            role: "JOB_SEEKER" as UserRole,
+            role: "JOB_SEEKER" as const,
             tenantId: null,
           }
         } else {
