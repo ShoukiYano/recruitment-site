@@ -155,7 +155,7 @@ export default function JobDetailPage({
             <Link href="/jobs" className="flex items-center gap-2">
               <Briefcase className="size-6 text-[#0D9488]" />
               <span className="text-lg font-bold text-gray-900">
-                AI採用プラットフォーム
+                採用プラットフォーム
               </span>
             </Link>
           </div>
@@ -407,7 +407,7 @@ export default function JobDetailPage({
       {/* フッター */}
       <footer className="bg-white border-t border-gray-200 py-8 mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-gray-500">
-          &copy; 2026 AI採用プラットフォーム All rights reserved.
+          &copy; 2026 採用プラットフォーム All rights reserved.
         </div>
       </footer>
     </div>

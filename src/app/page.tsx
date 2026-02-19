@@ -6,7 +6,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col items-center justify-center bg-background">
       <main className="flex flex-col items-center gap-8 text-center px-4">
         <h1 className="text-4xl font-bold tracking-tight text-primary sm:text-5xl">
-          AI採用プラットフォーム
+          採用プラットフォーム
         </h1>
         <p className="max-w-lg text-lg text-muted-foreground">
           AIを活用して、採用プロセスを自動化・最適化。

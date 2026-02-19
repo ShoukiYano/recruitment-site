@@ -44,7 +44,7 @@ export default function PlatformAdminLayout({ children }: { children: React.Reac
       <aside className="w-64 bg-[#1E3A5F] text-white flex flex-col">
         <div className="p-6 border-b border-[#2d5480]">
           <h1 className="text-lg font-bold">運営管理システム</h1>
-          <p className="text-xs text-blue-300 mt-1">AI採用プラットフォーム</p>
+          <p className="text-xs text-blue-300 mt-1">採用プラットフォーム</p>
         </div>
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {

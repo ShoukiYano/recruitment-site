@@ -60,7 +60,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-[#0D9488]">AI採用プラットフォーム</CardTitle>
+          <CardTitle className="text-2xl font-bold text-[#0D9488]">採用プラットフォーム</CardTitle>
           <CardDescription>求職者ログイン</CardDescription>
         </CardHeader>
         <CardContent>

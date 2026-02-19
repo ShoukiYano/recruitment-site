@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import Link from "next/link"
 
 export const metadata: Metadata = {
-  title: "求人検索 | AI採用プラットフォーム",
+  title: "求人検索 | 採用プラットフォーム",
   description: "AIを活用した求人検索・応募プラットフォーム",
 }
 
@@ -29,7 +29,7 @@ export default function JobseekerLayout({
             </Link>
           </div>
           <p className="text-center text-xs text-gray-400 mt-4">
-            © 2024 AI採用プラットフォーム. All rights reserved.
+            © 2024 採用プラットフォーム. All rights reserved.
           </p>
         </div>
       </footer>

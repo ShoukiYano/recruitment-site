@@ -107,7 +107,7 @@ export default function MyPage() {
           <div className="flex items-center justify-between h-16">
             <Link href="/jobs" className="flex items-center gap-2">
               <Briefcase className="size-6 text-[#0D9488]" />
-              <span className="text-lg font-bold text-gray-900">AI採用プラットフォーム</span>
+              <span className="text-lg font-bold text-gray-900">採用プラットフォーム</span>
             </Link>
             <div className="flex items-center gap-3">
               <span className="text-sm text-gray-600">{session.user.name}</span>

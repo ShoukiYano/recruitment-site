@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "プライバシーポリシー | AI採用プラットフォーム",
+  title: "プライバシーポリシー | 採用プラットフォーム",
 }
 
 export default function PrivacyPage() {

@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
-  title: "利用規約 | AI採用プラットフォーム",
+  title: "利用規約 | 採用プラットフォーム",
 }
 
 export default function TermsPage() {

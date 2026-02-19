@@ -113,7 +113,7 @@ export default function ApplyPage({
               <Link href="/jobs" className="flex items-center gap-2">
                 <Briefcase className="size-6 text-[#0D9488]" />
                 <span className="text-lg font-bold text-gray-900">
-                  AI採用プラットフォーム
+                  採用プラットフォーム
                 </span>
               </Link>
             </div>
@@ -155,7 +155,7 @@ export default function ApplyPage({
             <Link href="/jobs" className="flex items-center gap-2">
               <Briefcase className="size-6 text-[#0D9488]" />
               <span className="text-lg font-bold text-gray-900">
-                AI採用プラットフォーム
+                採用プラットフォーム
               </span>
             </Link>
           </div>

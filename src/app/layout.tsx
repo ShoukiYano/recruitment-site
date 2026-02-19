@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "AI採用プラットフォーム",
+  title: "採用プラットフォーム",
   description: "AIを活用した次世代採用管理システム",
 };
 
