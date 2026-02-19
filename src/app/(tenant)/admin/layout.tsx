@@ -47,6 +47,8 @@ export default function TenantAdminLayout({
   const router = useRouter()
   const { data: session } = useSession()
   const [tenantName, setTenantName] = useState<string>("")
+  const [subdomain, setSubdomain] = useState<string>("")
+  const [unreadCount, setUnreadCount] = useState(0)
 
   const userName = session?.user?.name ?? "管理者"
   const userInitial = userName.charAt(0)
@@ -56,6 +58,16 @@ export default function TenantAdminLayout({
       .then((res) => res.json())
       .then((json) => {
         if (json.data?.tenantName) setTenantName(json.data.tenantName)
+        if (json.data?.subdomain) setSubdomain(json.data.subdomain)
+      })
+      .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    fetch("/api/messages/unread-count")
+      .then((res) => res.json())
+      .then((json) => {
+        if (typeof json.count === "number") setUnreadCount(json.count)
       })
       .catch(console.error)
   }, [])
@@ -99,11 +111,16 @@ export default function TenantAdminLayout({
           <h1 className="text-white font-semibold">{tenantName || "採用管理"}</h1>
           <div className="flex items-center gap-4">
             {/* 通知アイコン */}
-            <button className="relative text-white/80 hover:text-white transition-colors">
+            <button
+              className="relative text-white/80 hover:text-white transition-colors"
+              onClick={() => router.push("/admin/messages")}
+            >
               <Bell className="h-5 w-5" />
-              <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
-                3
-              </span>
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] text-white flex items-center justify-center">
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </span>
+              )}
             </button>
 
             {/* ユーザーメニュー */}
@@ -131,7 +148,7 @@ export default function TenantAdminLayout({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="text-red-600"
-                  onClick={() => signOut({ callbackUrl: "/admin-login" })}
+                  onClick={() => signOut({ callbackUrl: subdomain ? `/t/${subdomain}/login` : "/login" })}
                 >
                   <LogOut className="h-4 w-4 mr-2" />
                   ログアウト

@@ -39,6 +39,7 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+seed-admin.ts
 
 # 内部ドキュメント（機密情報を含むため非公開）
 ADMIN_ACCESS.md

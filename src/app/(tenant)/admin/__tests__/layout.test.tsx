@@ -107,7 +107,7 @@ describe("TenantAdminLayout ユーザーメニュー", () => {
     expect(mockPush).toHaveBeenCalledWith("/admin/settings/ai")
   })
 
-  it("ログアウトをクリックすると signOut が /admin-login へのリダイレクトで呼ばれる", async () => {
+  it("ログアウトをクリックすると signOut がテナントログインページへのリダイレクトで呼ばれる", async () => {
     mockUseSession.mockReturnValue(makeSession("山田太郎"))
     renderLayout()
 
@@ -116,7 +116,9 @@ describe("TenantAdminLayout ユーザーメニュー", () => {
     const logoutItem = await screen.findByText("ログアウト")
     await userEvent.click(logoutItem)
 
-    expect(mockSignOut).toHaveBeenCalledWith({ callbackUrl: "/admin-login" })
+    // subdomainが取得できた場合は /t/{subdomain}/login、取得前は /login
+    const call = mockSignOut.mock.calls[0][0]
+    expect(call.callbackUrl).toMatch(/^\/t\/.+\/login$|^\/login$/)
   })
 
   // --- サイドバーナビゲーションテスト ---
