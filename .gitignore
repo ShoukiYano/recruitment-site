@@ -44,6 +44,7 @@ next-env.d.ts
 ADMIN_ACCESS.md
 SUPABASE_SETUP.md
 VERCEL_DEPLOY.md
+TAILSCALE_ARCHITECTURE.md
 
 # IDE・エディタ設定
 .vscode/
